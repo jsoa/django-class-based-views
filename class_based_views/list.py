@@ -12,6 +12,7 @@ class ListView(TemplateView):
     allow_empty = True
     template_object_name = None
     queryset = None
+    paginate_by = None
     
     def GET(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -26,12 +27,21 @@ class ListView(TemplateView):
         """
         Get the context for this view.
         """
-        context = {
-            'object_list': queryset,
-        }
+        context = {'object_list': queryset}
         template_object_name = self.get_template_object_name(queryset)
+        
         if template_object_name is not None:
             context[template_object_name] = queryset
+            
+        if self.get_paginate_by(queryset):
+            page = self.kwargs.get('page', None)
+            paginator, page, queryset = self.paginate_queryset(queryset, page)
+            context.update({
+                'paginator': paginator,
+                'page_obj': page,
+                'is_paginated': paginator is not None,
+            })
+                
         return context
     
     def get_queryset(self):
@@ -47,6 +57,32 @@ class ListView(TemplateView):
         if hasattr(queryset, '_clone'):
             queryset = queryset._clone()
         return queryset
+        
+    def paginate_queryset(self, queryset, page):
+        """
+        Paginate the queryset, if needed.
+        """
+        paginate_by = self.get_paginate_by(queryset)
+        paginator = Paginator(queryset, paginate_by, allow_empty_first_page=self.get_allow_empty())
+        page = page or self.request.GET.get('page', 1)
+        try:
+            page_number = int(page)
+        except ValueError:
+            if page == 'last':
+                page_number = paginator.num_pages
+            else:
+                raise Http404("Page is not 'last', nor can it be converted to an int.")
+        try:
+            page = paginator.page(page_number)
+            return (paginator, page, page.object_list)
+        except InvalidPage:
+            raise Http404('Invalid page (%s)' % page_number)
+
+    def get_paginate_by(self, queryset):
+        """
+        Get the number of items to paginate by, or ``None`` for no pagination.
+        """
+        return self.paginate_by
         
     def get_allow_empty(self):
         """
@@ -82,45 +118,4 @@ class ListView(TemplateView):
             return smart_str(queryset.model._meta.verbose_name_plural)
         else:
             return None
-    
-
-class PaginatedListView(ListView):
-    paginate_by = None
-    
-    def get_context(self, queryset):
-        page = self.kwargs.get('page', None)
-        paginator, page, queryset = self.paginate_queryset(queryset, page)
-        context = super(PaginatedListView, self).get_context(queryset)
-        context.update({
-            'paginator': paginator,
-            'page_obj': page,
-            'is_paginated': paginator is not None,
-        })
-        return context
-    
-    def paginate_queryset(self, queryset, page):
-        """
-        Paginate the queryset, if needed.
-        """
-        paginate_by = self.get_paginate_by(queryset)
-        paginator = Paginator(queryset, paginate_by, allow_empty_first_page=self.get_allow_empty())
-        page = page or self.request.GET.get('page', 1)
-        try:
-            page_number = int(page)
-        except ValueError:
-            if page == 'last':
-                page_number = paginator.num_pages
-            else:
-                raise Http404("Page is not 'last', nor can it be converted to an int.")
-        try:
-            page = paginator.page(page_number)
-            return (paginator, page, page.object_list)
-        except InvalidPage:
-            raise Http404('Invalid page (%s)' % page_number)
-    
-    def get_paginate_by(self, queryset):
-        """
-        Get the number of items to paginate by, or ``None`` for no pagination.
-        """
-        return self.paginate_by
-    
+        

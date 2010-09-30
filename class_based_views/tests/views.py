@@ -31,9 +31,10 @@ class AuthorList(class_based_views.ListView):
     template_name = 'tests/list.html'
 
 
-class PaginatedAuthorList(class_based_views.PaginatedListView):
+class PaginatedAuthorList(class_based_views.ListView):
     queryset = Author.objects.all()
     template_name = 'tests/list.html'
+    paginate_by = 5
 
 
 class AuthorCreate(class_based_views.CreateView):
