@@ -45,7 +45,7 @@ class DateView(ListView):
             qs = qs.filter(**{'%s__lte' % date_field: datetime.datetime.now()})
 
         if not allow_empty and not qs:
-            raise Http404("No %s available" % qs.model._meta.verbose_name_plural)
+            raise Http404("No %s available" % unicode(qs.model._meta.verbose_name_plural))
 
         return qs
 
